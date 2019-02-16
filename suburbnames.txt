@@ -1,0 +1,35 @@
+Allendale East,Allendale East SA 5291,Grey;Young
+Blackfellows Caves,Blackfellows Caves SA 5291,Kongorong
+Burrungule,Burrungule SA 5291,Benara;Blanche;Hindmarsh;Young
+Canunda,Canunda SA 5280,Benara;Kongorong;Mayurra;Rivoli Bay
+Cape Douglas,Cape Douglas SA 5291,Kongorong;MacDonnell
+Caroline,Caroline SA 5291,Caroline;Gambier
+Carpenter Rocks,Carpenter Rocks SA 5291,Benara;Kongorong
+Caveton,Caveton SA 5291,Caroline
+Compton,Compton SA 5291,Blanche
+Dismal Swamp,Dismal Swamp SA 5291,Mingbool;Young
+Donovans,Donovans SA 5291,Caroline
+Eight Mile Creek,Eight Mile Creek SA 5291,Caroline;MacDonnell
+German Creek,German Creek SA 5291,Benara
+Glenburnie,Glenburnie SA 5291,Gambier
+Kongorong,Kongorong SA 5291,Benara;Kongorong
+Mil-Lel,Mil-Lel SA 5291,Gambier
+Mingbool,Mingbool SA 5291,Mingbool
+Moorak,Moorak SA 5291,Blanche;MacDonnell
+Mount Schank,Mount Schank SA 5291,MacDonnell
+Nene Valley,Nene Valley SA 5291,Kongorong
+O B Flat,OB Flat SA 5291,Blanche;Caroline;Gambier;MacDonnell
+OB Flat,OB Flat SA 5291,Blanche;Caroline;Gambier;MacDonnell
+Pelican Point,Pelican Point SA 5291,Kongorong
+Pleasant Park,Pleasant Park SA 5277,Mingbool
+Port MacDonnell,Port MacDonnell SA 5291,MacDonnell
+Racecourse Bay,Racecourse Bay SA 5291,MacDonnell
+Square Mile,Square Mile SA 5291,Gambier
+Suttontown,Suttontown SA 5291,Blanche
+Tantanoola,Tantanoola SA 5280,Benara;Hindmarsh;Mayurra
+Tarpeena,Tarpeena SA 5277,Mingbool;Young
+Wandilo,Wandilo SA 5291,Blanche;Young
+Wepar,Wepar SA 5278,Grey;Young
+Worrolong,Worrolong SA 5291,Gambier
+Wye,Wye SA 5291,Caroline
+Yahl,Yahl SA 5291,Caroline;Gambier
