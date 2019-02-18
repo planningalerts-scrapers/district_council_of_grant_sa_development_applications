@@ -599,7 +599,7 @@ async function parsePdf(url: string) {
 
         if (applicationNumberCell === undefined) {
             let elementSummary = elements.map(element => `[${element.text}]`).join("");
-            console.log(`No development applications can be parsed from the current page because the "ASSESS" column heading was not found.  Elements: ${elementSummary}`);
+            console.log(`No development applications can be parsed from the current page because the "APPLICATION" column heading was not found.  Elements: ${elementSummary}`);
             continue;
         }
 
