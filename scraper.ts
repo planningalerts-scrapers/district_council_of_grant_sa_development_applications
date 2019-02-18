@@ -163,13 +163,13 @@ function intersect(rectangle1: Rectangle, rectangle2: Rectangle): Rectangle {
         return { x: 0, y: 0, width: 0, height: 0 };
 }
 
-// Determines whether containerRectangle completely contains containedRectangle.
+// Calculates the fraction of an element that lies within a cell (as a percentage).  For example,
+// if a quarter of the specifed element lies within the specified cell then this would return 25.
 
-function contains(containerRectangle: Rectangle, containedRectangle: Rectangle) {
-    return containerRectangle.x <= containedRectangle.x &&
-        containerRectangle.y <= containedRectangle.y &&
-        containerRectangle.x + containerRectangle.width >= containedRectangle.x + containedRectangle.width &&
-        containerRectangle.y + containerRectangle.height >= containedRectangle.y + containedRectangle.height;
+function getPercentageOfElementInCell(element: Element, cell: Cell) {
+    let elementArea = getArea(element);
+    let intersectionArea = getArea(intersect(cell, element));
+    return (elementArea === 0) ? 0 : ((intersectionArea * 100) / elementArea);
 }
 
 // Calculates the area of a rectangle.
@@ -203,7 +203,7 @@ function getHorizontalOverlapPercentage(rectangle1: Rectangle, rectangle2: Recta
 // Formats the text as a street.  If the text is not recognised as a street then undefined is
 // returned.
 
-function formatStreet(text) {
+function formatStreet(text: string) {
     if (text === undefined)
         return undefined;
 
@@ -251,7 +251,7 @@ function formatStreet(text) {
 
 // Formats the address, ensuring that it has a valid suburb, state and post code.
 
-function formatAddress(address) {
+function formatAddress(address: string) {
     // Allow for a few special cases (ie. road type suffixes and multiple addresses).
 
     address = address.replace(/ TCE NTH/g, " TERRACE NORTH").replace(/ TCE STH/g, " TERRACE SOUTH").replace(/ TCE EAST/g, " TERRACE EAST").replace(/ TCE WEST/g, " TERRACE WEST");
@@ -370,80 +370,6 @@ function formatAddress(address) {
     return address;
 }
 
-// Parses any elements that intersect more than one cell (and splits them into multiple elements).
-
-function removeOverhangingElements(rows: Cell[][], assessmentCell: Cell, descriptionCell: Cell, decisionDateCell: Cell) {
-    for (let row of rows) {
-        for (let columnIndex = 0; columnIndex < row.length; columnIndex++) {
-            let cell = row[columnIndex];
-
-            let overhangElements = cell.elements.filter(element => !contains(cell, element));
-            for (let overhangElement of overhangElements) {
-                // Find the companions (ie. roughly aligned with the same Y co-ordinate) of an
-                // element that intersects more than one cell.
-
-                let alignedElements: Element[] = [];
-                for (let index = cell.elements.length - 1; index >= 0; index--) {
-                    if (Math.abs(cell.elements[index].y - overhangElement.y) < 5) {  // elements with approximately the same Y co-ordinate
-                        alignedElements.unshift(cell.elements[index]);
-                        cell.elements.splice(index, 1); // remove the element
-                    }
-                }
-
-                // Join the aligned elements together and parse the resulting text.  Construct
-                // elements for the resulting text and add those elements to appropriate cells
-                // (these new elements effectively replace the old, removed elements).
-
-                let text = alignedElements.map(element => element.text).join("").trim();
-                if (text === "")
-                    continue;
-
-                if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
-                    // Parse the text into an assessment, a VG number and an application
-                    // number.
-
-                    let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
-                    let [assessmentText, vgNumberText, applicationNumberText] = tokens;
-                    cell.elements.push({ text: assessmentText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
-                    if (columnIndex + 1 < row.length && vgNumberText !== undefined) {
-                        let vgNumberCell = row[columnIndex + 1];
-                        vgNumberCell.elements.push({ text: vgNumberText, x: vgNumberCell.x, y: alignedElements[0].y, width: vgNumberCell.width, height: alignedElements[0].height });
-                    }
-
-                    if (columnIndex + 2 < row.length && applicationNumberText !== undefined) {
-                        let applicationNumberCell = row[columnIndex + 2];
-                        applicationNumberCell.elements.push({ text: applicationNumberText, x: applicationNumberCell.x, y: alignedElements[0].y, width: applicationNumberCell.width, height: alignedElements[0].height });
-                    }
-                } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
-                    // Parse the text into a description and a decision date.
-
-                    let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
-                    let [descriptionText, decisionDateText] = tokens;
-                    cell.elements.push({ text: descriptionText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
-                    if (columnIndex + 1 < row.length && decisionDateText !== undefined) {
-                        let decisionDateCell = row[columnIndex + 1];
-                        decisionDateCell.elements.push({ text: decisionDateText, x: decisionDateCell.x, y: alignedElements[0].y, width: decisionDateCell.width, height: alignedElements[0].height });
-                    }
-                } else if (getHorizontalOverlapPercentage(cell, decisionDateCell) > 90) {
-                    // Parse the text into a decision date.
-
-                    let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
-                    let [decisionDateText] = tokens;
-                    cell.elements.push({ text: decisionDateText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
-                }
-            }
-        }
-    }
-
-    // Re-sort the elements in each cell (now that elements have been re-constructed and then
-    // added to different cells).
-
-    let elementComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
-    for (let row of rows)
-        for (let cell of row)
-            cell.elements.sort(elementComparer);
-}
-
 // Examines all the lines in a page of a PDF and constructs cells (ie. rectangles) based on those
 // lines.
 
@@ -455,84 +381,107 @@ async function parseCells(page) {
 
     let lines: Rectangle[] = [];
 
-    for (let index = 0; index < operators.fnArray.length; index++) {
-        if (operators.fnArray[index] !== pdfjs.OPS.constructPath)
-            continue;
-            
-        let x = operators.argsArray[index][1][1];
-        let y = operators.argsArray[index][1][0];
-        let width = operators.argsArray[index][1][3];
-        let height = operators.argsArray[index][1][2];
+    let previousRectangle = undefined;
+    let transformStack = [];
+    let transform = [ 1, 0, 0, 1, 0, 0 ];
+    transformStack.push(transform);
 
-        lines.push({x: x, y: y, width: width, height: height});
+    for (let index = 0; index < operators.fnArray.length; index++) {
+        let argsArray = operators.argsArray[index];
+
+        if (operators.fnArray[index] === pdfjs.OPS.restore)
+            transform = transformStack.pop();
+        else if (operators.fnArray[index] === pdfjs.OPS.save)
+            transformStack.push(transform);
+        else if (operators.fnArray[index] === pdfjs.OPS.transform)
+            transform = pdfjs.Util.transform(transform, argsArray);
+        else if (operators.fnArray[index] === pdfjs.OPS.constructPath) {
+            let argumentIndex = 0;
+            for (let operationIndex = 0; operationIndex < argsArray[0].length; operationIndex++) {
+                if (argsArray[0][operationIndex] === pdfjs.OPS.moveTo)
+                    argumentIndex += 2;
+                else if (argsArray[0][operationIndex] === pdfjs.OPS.lineTo)
+                    argumentIndex += 2;
+                else if (argsArray[0][operationIndex] === pdfjs.OPS.rectangle) {
+                    let x1 = argsArray[1][argumentIndex++];
+                    let y1 = argsArray[1][argumentIndex++];
+                    let width = argsArray[1][argumentIndex++];
+                    let height = argsArray[1][argumentIndex++];
+                    let x2 = x1 + width;
+                    let y2 = y1 + height;
+                    [x1, y1] = pdfjs.Util.applyTransform([x1, y1], transform);
+                    [x2, y2] = pdfjs.Util.applyTransform([x2, y2], transform);
+                    width = x2 - x1;
+                    height = y2 - y1;
+                    previousRectangle = { x: x1, y: y1, width: width, height: height };
+                }
+            }
+        } else if (operators.fnArray[index] === pdfjs.OPS.fill && previousRectangle !== undefined) {
+            lines.push(previousRectangle);
+            previousRectangle = undefined;
+        }
     }
 
-    // Convert the lines into a grid of points.
+    // Determine all the horizontal lines and vertical lines that make up the grid.
 
-    let points: Point[] = [];
+    let horizontalLines: Rectangle[] = [];
+    let verticalLines: Rectangle[] = [];
 
     for (let line of lines) {
-        // Ignore thick lines (since these are probably intented to be drawn as rectangles).
-        // And ignore short lines (because these are probably of no consequence).
+        // Ignore short lines or smaller rectangles (since these are probably part of the logo at
+        // the top left of the page).
 
-        if ((line.width > 2 && line.height > 2) || (line.width <= 2 && line.height < 10) || (line.height <= 2 && line.width < 10))
+        if (line.width < 200 && line.height < 200)
             continue;
+        
+        // Convert any larger rectangles into lines.  This almost always corresponds to a header
+        // (so only take note of the horizontal lines; avoid allowing the vertical lines to cause
+        // very narrow cells to be created).
 
-        let startPoint: Point = { x: line.x, y: line.y };
-        if (!points.some(point => (startPoint.x - point.x) ** 2 + (startPoint.y - point.y) ** 2 < 1))
-            points.push(startPoint);
-
-        let endPoint: Point = undefined;
+        if ((line.width > 10 && line.height > 200) || (line.height > 10 && line.width > 200)) {
+            horizontalLines.push({ x: line.x, y: line.y, width: line.width, height: 1 });
+            horizontalLines.push({ x: line.x, y: line.y + line.height, width: line.width, height: 1 });
+            continue;
+        }
+            
         if (line.height <= 2)  // horizontal line
-            endPoint = { x: line.x + line.width, y: line.y };
+            horizontalLines.push(line);
         else  // vertical line
-            endPoint = { x: line.x, y: line.y + line.height };
-
-        if (!points.some(point => (endPoint.x - point.x) ** 2 + (endPoint.y - point.y) ** 2 < 1))
-            points.push(endPoint);
+            verticalLines.push(line);
     }
 
-    // Construct cells based on the grid of points.
+    let verticalLineComparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
+    verticalLines.sort(verticalLineComparer);
+
+    let horizontalLineComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : 0);
+    horizontalLines.sort(horizontalLineComparer);
+    
+    // Construct cells based on the grid of lines.
 
     let cells: Cell[] = [];
-    for (let point of points) {
-        // Find the next closest point in the X direction (moving across horizontally with
-        // approximately the same Y co-ordinate).
 
-        let closestRightPoint = points.reduce(
-            ((previous, current) => (Math.abs(current.y - point.y) < 1 && current.x > point.x && (previous === undefined || (current.x - point.x < previous.x - point.x))) ? current : previous),
-            undefined);
-
-        // Find the next closest point in the Y direction (moving down vertically with
-        // approximately the same X co-ordinate).
-
-        let closestDownPoint = points.reduce(
-            ((previous, current) => (Math.abs(current.x - point.x) < 1 && current.y > point.y && (previous === undefined || (current.y - point.y < previous.y - point.y))) ? current : previous),
-            undefined);
-
-        // Construct a rectangle from the found points.
-
-        if (closestRightPoint !== undefined && closestDownPoint !== undefined)
-            cells.push({ elements: [], x: point.x, y: point.y, width: closestRightPoint.x - point.x, height: closestDownPoint.y - point.y });
+    for (let horizontalLineIndex = 0; horizontalLineIndex < horizontalLines.length - 1; horizontalLineIndex++) {
+        for (let verticalLineIndex = 0; verticalLineIndex < verticalLines.length - 1; verticalLineIndex++) {
+            let horizontalLine = horizontalLines[horizontalLineIndex];
+            let nextHorizontalLine = horizontalLines[horizontalLineIndex + 1];
+            let verticalLine = verticalLines[verticalLineIndex];
+            let nextVerticalLine = verticalLines[verticalLineIndex + 1];
+            cells.push({ elements: [], x: verticalLine.x, y: horizontalLine.y, width: nextVerticalLine.x - verticalLine.x, height: nextHorizontalLine.y - horizontalLine.y });
+        }
     }
 
-    // Sort the cells by approximate Y co-ordinate and then by X co-ordinate.
-
-    let cellComparer = (a, b) => (Math.abs(a.y - b.y) < 2) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
-    cells.sort(cellComparer);
     return cells;
 }
 
 // Parses the text elements from a page of a PDF.
 
 async function parseElements(page) {
-    let viewport = await page.getViewport(1.0);
     let textContent = await page.getTextContent();
 
     // Find all the text elements.
 
     let elements: Element[] = textContent.items.map(item => {
-        let transform = pdfjs.Util.transform(viewport.transform, item.transform);
+        let transform = item.transform;
 
         // Work around the issue https://github.com/mozilla/pdf.js/issues/8276 (heights are
         // exaggerated).  The problem seems to be that the height value is too large in some
@@ -542,17 +491,13 @@ async function parseElements(page) {
         let workaroundHeight = Math.sqrt(transform[2] * transform[2] + transform[3] * transform[3]);
 
         let x = transform[4];
-        let y = transform[5] - workaroundHeight;
+        let y = transform[5];
         let width = item.width;
         let height = workaroundHeight;
 
         return { text: item.str, x: x, y: y, width: width, height: height };
     });
 
-    // Sort the text elements by approximate Y co-ordinate and then by X co-ordinate.
-
-    let elementComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
-    elements.sort(elementComparer);
     return elements;
 }
 
@@ -584,13 +529,29 @@ async function parsePdf(url: string) {
 
         let elements = await parseElements(page);
 
-        // Allocate each element to an "owning" cell.  An element may extend across several
-        // cells (because the PDF parsing may join together multiple sections of text, using
-        // multiple intervening spaces; see addFakeSpaces in pdf.worker.js of pdf.js).  If
-        // there are multiple cells then allocate the element to the left most cell.
+        // The co-ordinate system used in a PDF is typically "upside done" so invert the
+        // co-ordinates (and so this makes the subsequent logic easier to understand).
+
+        for (let cell of cells)
+            cell.y = -(cell.y + cell.height);
+
+        for (let element of elements)
+            element.y = -(element.y + element.height);
+
+        // Sort the cells by approximate Y co-ordinate and then by X co-ordinate.
+
+        let cellComparer = (a, b) => (Math.abs(a.y - b.y) < 2) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
+        cells.sort(cellComparer);
+
+        // Sort the text elements by approximate Y co-ordinate and then by X co-ordinate.
+
+        let elementComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
+        elements.sort(elementComparer);
+
+        // Allocate each element to an "owning" cell.
 
         for (let element of elements) {
-            let ownerCell = cells.find(cell => getArea(intersect(cell, element)) > 0);  // this finds the left most cell due to the earlier sorting of cells
+            let ownerCell = cells.find(cell => getPercentageOfElementInCell(element, cell) > 50);  // at least 50% of the element must be within the cell deemed to be the owner
             if (ownerCell !== undefined)
                 ownerCell.elements.push(element);
         }
@@ -628,11 +589,13 @@ async function parsePdf(url: string) {
 
         // Find the heading cells.
 
-        let assessmentCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "ASSESS" && contains(cell, element)));
-        let applicationNumberCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "APPLICATION" && contains(cell, element)));
-        let addressCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "PROPERTY ADDRESS" && contains(cell, element)));
-        let descriptionCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DESCRIPTION" && contains(cell, element)));
-        let decisionDateCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DECISION" && contains(cell, element)));
+        let applicationNumberCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "APPLICATION"));
+        let receivedDateCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "RECEIPT"));
+        let houseNumberCell = cells.find(cell => cell.elements.map(element => element.text.trim()).join(" ") === "NO.");
+        let lotCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "LOT"));
+        let sectionCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "SECTION /"));
+        let addressCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "PROPERTY ADDRESS"));
+        let descriptionCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DESCRIPTION"));
 
         if (applicationNumberCell === undefined) {
             let elementSummary = elements.map(element => `[${element.text}]`).join("");
@@ -646,30 +609,55 @@ async function parsePdf(url: string) {
             continue;
         }
 
-        // Parse any elements that intersect more than one cell (and split them into multiple
-        // elements).  This also ensures the elements in each cell are appropriately sorted by
-        // approximate Y co-ordinate and then by X co-ordinate.
-
-        removeOverhangingElements(rows, assessmentCell, descriptionCell, decisionDateCell);
-
         // Try to extract a development application from each row (some rows, such as the heading
         // row, will not actually contain a development application).
 
         for (let row of rows) {
             let rowApplicationNumberCell = row.find(cell => getHorizontalOverlapPercentage(cell, applicationNumberCell) > 90);
+            let rowReceivedDateCell = row.find(cell => getHorizontalOverlapPercentage(cell, receivedDateCell) > 90);
+            let rowHouseNumberCell = row.find(cell => getHorizontalOverlapPercentage(cell, houseNumberCell) > 90);
+            let rowLotCell = row.find(cell => getHorizontalOverlapPercentage(cell, lotCell) > 90);
+            let rowSectionCell = row.find(cell => getHorizontalOverlapPercentage(cell, sectionCell) > 90);
             let rowAddressCell = row.find(cell => getHorizontalOverlapPercentage(cell, addressCell) > 90);
             let rowDescriptionCell = row.find(cell => getHorizontalOverlapPercentage(cell, descriptionCell) > 90);
 
-            let applicationNumber = rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
-            let address = rowAddressCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
-            let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
+            // Check that there is a valid application number.
 
-            if (!/[0-9]+\/[0-9]+\/[0-9]/.test(applicationNumber))  // an application number must be present
+            if (rowApplicationNumberCell === undefined)
+                continue;
+            let applicationNumber = rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
+            if (!/[0-9]+\/[0-9]+/.test(applicationNumber))  // an application number must be present, for example, "141/17"
                 continue;
 
+            // Construct the address.
+
+            let houseNumber = (rowHouseNumberCell === undefined || rowHouseNumberCell.elements.length === 0 || rowHouseNumberCell.elements[0].text.trim() === "-") ? "" : rowHouseNumberCell.elements[0].text;
+            let address = (houseNumber + " " + rowAddressCell.elements.map(element => element.text).join(", ")).replace(/\s\s+/g, " ").trim();
             address = formatAddress(address);
             if (address === "")  // an address must be present
                 continue;
+
+            // Construct the description.
+
+            let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join(" ").replace(/\s\s+/g, " ").trim();
+
+            // Construct the received date.
+
+            let receivedDate = moment.invalid();
+            if (rowReceivedDateCell !== undefined && rowReceivedDateCell.elements.length > 0)
+                receivedDate = moment(rowReceivedDateCell.elements[0].text.trim(), "D/MM/YYYY", true);
+
+            // Construct the legal description.
+
+            let legalElements = [];
+            if (rowLotCell !== undefined && rowLotCell.elements.length > 0)
+                legalElements.push(`Lot ${rowLotCell.elements[0].text}`);
+            if (rowSectionCell !== undefined && rowSectionCell.elements.length > 0)
+                legalElements.push(`Section ${rowSectionCell.elements[0].text}`);
+            let hundredElement = rowAddressCell.elements.find(element => element.text.startsWith("HD ") || element.text.toUpperCase().startsWith("HUNDRED "));
+            if (hundredElement !== undefined)
+                legalElements.push(`Hundred ${hundredElement.text.replace(/^HD /, "").replace(/^HUNDRED /i, "").trim()}`);
+            let legalDescription = legalElements.join(", ");
 
             developmentApplications.push({
                 applicationNumber: applicationNumber,
@@ -677,7 +665,9 @@ async function parsePdf(url: string) {
                 description: ((description === "") ? "NO DESCRIPTION PROVIDED" : description),
                 informationUrl: url,
                 commentUrl: CommentUrl,
-                scrapeDate: moment().format("YYYY-MM-DD")
+                scrapeDate: moment().format("YYYY-MM-DD"),
+                receivedDate: receivedDate.isValid ? receivedDate.format("YYYY-MM-DD") : "",
+                legalDescription: legalDescription
             });        
         }
     }
