@@ -621,7 +621,7 @@ async function parsePdf(url: string) {
             let rowAddressCell = row.find(cell => getHorizontalOverlapPercentage(cell, addressCell) > 90);
             let rowDescriptionCell = row.find(cell => getHorizontalOverlapPercentage(cell, descriptionCell) > 90);
 
-            // Check that there is a valid application number.
+            // Construct the application number.
 
             if (rowApplicationNumberCell === undefined)
                 continue;
@@ -631,7 +631,20 @@ async function parsePdf(url: string) {
 
             // Construct the address.
 
-            let houseNumber = (rowHouseNumberCell === undefined || rowHouseNumberCell.elements.length === 0 || rowHouseNumberCell.elements[0].text.trim() === "-") ? "" : rowHouseNumberCell.elements[0].text;
+            if (rowAddressCell === undefined)
+                continue;
+            
+            let hundred = "";
+            let hundredElement = rowAddressCell.elements.pop();
+            if (hundredElement.text.trim().startsWith("HD ") || hundredElement.text.trim().toUpperCase().startsWith("HUNDRED "))
+                hundred = hundredElement.text.replace(/^HD /, "").replace(/^HUNDRED /i, "").trim();  // extract the hundred name from the last element
+            else
+                rowAddressCell.elements.push(hundredElement);
+
+            let houseNumber = "";
+            if (rowHouseNumberCell !== undefined)
+                houseNumber = rowHouseNumberCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" ").replace(/\s\s+/g, " ").trim();
+            
             let address = (houseNumber + " " + rowAddressCell.elements.map(element => element.text).join(", ")).replace(/\s\s+/g, " ").trim();
             address = formatAddress(address);
             if (address === "")  // an address must be present
@@ -650,13 +663,24 @@ async function parsePdf(url: string) {
             // Construct the legal description.
 
             let legalElements = [];
-            if (rowLotCell !== undefined && rowLotCell.elements.length > 0 && rowLotCell.elements[0].text.trim() !== "-")
-                legalElements.push(`Lot ${rowLotCell.elements[0].text}`);
-            if (rowSectionCell !== undefined && rowSectionCell.elements.length > 0 && rowLotCell.elements[0].text.trim() !== "-")
-                legalElements.push(`Section ${rowSectionCell.elements[0].text}`);
-            let hundredElement = rowAddressCell.elements.find(element => element.text.startsWith("HD ") || element.text.toUpperCase().startsWith("HUNDRED "));
-            if (hundredElement !== undefined)
-                legalElements.push(`Hundred ${hundredElement.text.replace(/^HD /, "").replace(/^HUNDRED /i, "").trim()}`);
+
+            let lot = "";
+            if (rowLotCell !== undefined) {
+                lot = rowLotCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" ").replace(/\s\s+/g, " ").trim();
+                if (lot !== "")
+                    legalElements.push(`Lot ${lot}`);
+            }
+
+            let section = "";
+            if (rowSectionCell !== undefined) {
+                section = rowSectionCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" ").replace(/\s\s+/g, " ").trim();
+                if (section !== "")
+                    legalElements.push(`Section ${section}`);
+            }
+
+            if (hundred !== "")
+                legalElements.push(`Hundred ${hundred}`);
+
             let legalDescription = legalElements.join(", ");
 
             developmentApplications.push({
