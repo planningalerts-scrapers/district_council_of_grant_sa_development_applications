@@ -650,9 +650,9 @@ async function parsePdf(url: string) {
             // Construct the legal description.
 
             let legalElements = [];
-            if (rowLotCell !== undefined && rowLotCell.elements.length > 0)
+            if (rowLotCell !== undefined && rowLotCell.elements.length > 0 && rowLotCell.elements[0].text.trim() !== "-")
                 legalElements.push(`Lot ${rowLotCell.elements[0].text}`);
-            if (rowSectionCell !== undefined && rowSectionCell.elements.length > 0)
+            if (rowSectionCell !== undefined && rowSectionCell.elements.length > 0 && rowLotCell.elements[0].text.trim() !== "-")
                 legalElements.push(`Section ${rowSectionCell.elements[0].text}`);
             let hundredElement = rowAddressCell.elements.find(element => element.text.startsWith("HD ") || element.text.toUpperCase().startsWith("HUNDRED "));
             if (hundredElement !== undefined)
