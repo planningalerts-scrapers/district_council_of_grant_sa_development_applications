@@ -643,7 +643,7 @@ async function parsePdf(url: string) {
 
             let houseNumber = "";
             if (rowHouseNumberCell !== undefined)
-                houseNumber = rowHouseNumberCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" ").replace(/\s\s+/g, " ").trim();
+                houseNumber = rowHouseNumberCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" AND ").replace(/\s\s+/g, " ").trim();
             
             let address = (houseNumber + " " + rowAddressCell.elements.map(element => element.text).join(", ")).replace(/\s\s+/g, " ").trim();
             address = formatAddress(address);
@@ -666,14 +666,14 @@ async function parsePdf(url: string) {
 
             let lot = "";
             if (rowLotCell !== undefined) {
-                lot = rowLotCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" ").replace(/\s\s+/g, " ").trim();
+                lot = rowLotCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" and ").replace(/\s\s+/g, " ").trim();
                 if (lot !== "")
                     legalElements.push(`Lot ${lot}`);
             }
 
             let section = "";
             if (rowSectionCell !== undefined) {
-                section = rowSectionCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" ").replace(/\s\s+/g, " ").trim();
+                section = rowSectionCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" and ").replace(/\s\s+/g, " ").trim();
                 if (section !== "")
                     legalElements.push(`Section ${section}`);
             }
