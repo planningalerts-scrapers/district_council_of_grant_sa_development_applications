@@ -17,6 +17,7 @@ Hwy,Highway
 La,Lane
 Ln,Lane
 Nth,North
+Pde,Parade
 Pl,Place
 Rd,Road
 Sq,Square

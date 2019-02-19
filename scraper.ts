@@ -200,174 +200,69 @@ function getHorizontalOverlapPercentage(rectangle1: Rectangle, rectangle2: Recta
     return (intersectionWidth * 100) / unionWidth;
 }
 
-// Formats the text as a street.  If the text is not recognised as a street then undefined is
-// returned.
+// Formats the text as a street.
 
-function formatStreet(text: string) {
+function formatStreetName(text: string) {
     if (text === undefined)
-        return undefined;
+        return text;
 
     let tokens = text.trim().toUpperCase().split(" ");
 
-    // Parse the street suffix (this recognises both "ST" and "STREET").
+    // Expand the street suffix (for example, this converts "ST" to "STREET").
 
     let token = tokens.pop();
     let streetSuffix = StreetSuffixes[token];
-    if (streetSuffix === undefined)
-        streetSuffix = Object.values(StreetSuffixes).find(streetSuffix => streetSuffix === token);
-
-    // The text is not considered to be a valid street if it has no street suffix.
-
-    if (streetSuffix === undefined)
-        return undefined;
-
-    // Add back the expanded street suffix (for example, this converts "ST" to "STREET").
-
-    tokens.push(streetSuffix);
+    tokens.push((streetSuffix === undefined) ? token : streetSuffix);
 
     // Extract tokens from the end of the array until a valid street name is encountered (this
-    // looks for an exact match).
+    // looks for an exact match).  Note that "PRINCESS MARGARET ROSE CAVES ROAD" is the street
+    // name with the most words (ie. five).  But there may be more words in the street name due
+    // to errant spaces.
 
-    for (let index = 4; index >= 2; index--) {
-        let suburbNames = StreetNames[tokens.slice(-index).join(" ")];
-        if (suburbNames !== undefined)
-            return { streetName: tokens.join(" "), suburbNames: suburbNames };  // reconstruct the street with the leading house number (and any other prefix text)
-    }
+    for (let index = 6; index >= 2; index--)
+        if (StreetNames[tokens.slice(-index).join(" ")] !== undefined)
+            return tokens.join(" ");  // reconstruct the street with the leading house number (and any other prefix text)
 
     // Extract tokens from the end of the array until a valid street name is encountered (this
     // allows for a spelling error).
 
-    for (let index = 4; index >= 2; index--) {
-        let streetNameMatch = <string>didYouMean(tokens.slice(-index).join(" "), Object.keys(StreetNames), { caseSensitive: false, returnType: didyoumean.ReturnTypeEnums.FIRST_CLOSEST_MATCH, thresholdType: didyoumean.ThresholdTypeEnums.EDIT_DISTANCE, threshold: 1, trimSpaces: true });
+    for (let index = 6; index >= 2; index--) {
+        let threshold = 7 - index;  // set the number of allowed spelling errors proportional to the number of words
+        let streetNameMatch = <string>didYouMean(tokens.slice(-index).join(" "), Object.keys(StreetNames), { caseSensitive: false, returnType: didyoumean.ReturnTypeEnums.FIRST_CLOSEST_MATCH, thresholdType: didyoumean.ThresholdTypeEnums.EDIT_DISTANCE, threshold: threshold, trimSpaces: true });
         if (streetNameMatch !== null) {
-            let suburbNames = StreetNames[streetNameMatch];
             tokens.splice(-index, index);  // remove elements from the end of the array           
-            return { streetName: (tokens.join(" ") + " " + streetNameMatch).trim(), suburbNames: suburbNames };  // reconstruct the street with the leading house number (and any other prefix text)
+            return (tokens.join(" ") + " " + streetNameMatch).trim();  // reconstruct the street with any other original prefix text
         }
     }
 
-    return undefined;
+    return text;
 }
 
 // Formats the address, ensuring that it has a valid suburb, state and post code.
 
 function formatAddress(address: string) {
-    // Allow for a few special cases (ie. road type suffixes and multiple addresses).
+    // Allow for a few special cases (eg. road type suffixes).
 
     address = address.replace(/ TCE NTH/g, " TERRACE NORTH").replace(/ TCE STH/g, " TERRACE SOUTH").replace(/ TCE EAST/g, " TERRACE EAST").replace(/ TCE WEST/g, " TERRACE WEST");
 
     // Break the address up based on commas (the main components of the address are almost always
     // separated by commas).
 
-    let tokens = address.split(",");
+    let commaIndex = address.lastIndexOf(",");
+    if (commaIndex < 0)
+        return address;
+    let streetName = address.substring(0, commaIndex);
+    let suburbName = address.substring(commaIndex + 1);
 
-    // Find the location of the street name in the tokens.
+    // Add the state and post code to the suburb name.
 
-    let streetNameIndex = 3;
-    let formattedStreet = formatStreet(tokens[tokens.length - streetNameIndex]);  // the street name is most likely in the third to last token (so try this first)
-    if (formattedStreet === undefined) {
-        streetNameIndex = 2;
-        formattedStreet = formatStreet(tokens[tokens.length - streetNameIndex]);  // try the second to last token (occasionally happens)
-        if (formattedStreet === undefined) {
-            streetNameIndex = 4;
-            formattedStreet = formatStreet(tokens[tokens.length - streetNameIndex]);  // try the fourth to last token (rare)
-            if (formattedStreet === undefined)
-                return address;  // if a street name is not found then give up
-        }
-    }
+    suburbName = <string>didYouMean(suburbName, Object.keys(SuburbNames), { caseSensitive: false, returnType: didyoumean.ReturnTypeEnums.FIRST_CLOSEST_MATCH, thresholdType: didyoumean.ThresholdTypeEnums.EDIT_DISTANCE, threshold: 2, trimSpaces: true });
+    if (suburbName === null)
+        return address;
 
-    // If there is one token after the street name then assume that it is a hundred name.  For
-    // example,
-    //
-    // LOT 15, SECTION P.2299,  KIRIP RD, HINDMARSH
+    // Reconstruct the full address using the formatted street name and determined suburb name.
 
-    if (streetNameIndex === 2) {
-        let hundredSuburbNames = [];
-
-        let token = tokens[tokens.length - 1].trim();
-        if (token.startsWith("HD "))
-            token = token.substring("HD ".length).trim();
-
-        let hundredNameMatch = <string>didYouMean(token, Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: didyoumean.ReturnTypeEnums.FIRST_CLOSEST_MATCH, thresholdType: didyoumean.ThresholdTypeEnums.EDIT_DISTANCE, threshold: 2, trimSpaces: true });
-        if (hundredNameMatch !== null)
-            hundredSuburbNames = HundredSuburbNames[hundredNameMatch];
-
-        // Construct the intersection of two arrays of suburb names (ignoring the array of suburb
-        // names derived from the hundred name if it is empty).
-
-        let intersectingSuburbNames = formattedStreet.suburbNames
-            .filter(suburbName => hundredSuburbNames === null || hundredSuburbNames.indexOf(suburbName) >= 0);
-        let suburbName = (intersectingSuburbNames.length === 0) ? formattedStreet.suburbNames[0] : intersectingSuburbNames[0];
-
-        // Reconstruct the full address using the formatted street name and determined suburb name.
-
-        tokens = tokens.slice(0, tokens.length - streetNameIndex);
-        tokens.push(formattedStreet.streetName);
-        tokens.push(SuburbNames[suburbName]);
-        return tokens.join(", ");
-    }
-
-    // If there are two tokens after the street name then assume that they are the suburb name
-    // followed by the hundred name (however, if the suburb name is prefixed by "HD " then assume
-    // that they are both hundred names).  For example,
-    //
-    // LOT 1, 2 BAKER ST, SOUTHEND, RIVOLI BAY
-    // LOT 4, SECTION ,  KIRIP RD, HD HINDMARSH, HINDMARSH
-    //
-    // If there are three tokens after the street name then ignore the first token and assume that
-    // the second and third tokens are the suburb name followed by the hundred name (however, if
-    // the suburb name is prefixed by "HD " then assume that they are both hundred names).  For
-    // example,
-    //
-    // SECTION P.399, 10 SOMERVILLE ST,S.O.T.P, BEACHPORT, RIVOLI BAY
-    // LOT 4, 20 SOMERVILLE ST, S.O.T.P., HD RIVOLI BAY, RIVOLI BAY
-
-    if (streetNameIndex === 3 || streetNameIndex === 4) {
-        let hundredSuburbNames1 = [];
-        let hundredSuburbNames2 = [];
-        let suburbNames = [];
-
-        let token = tokens[tokens.length - 1].trim();
-        if (token.startsWith("HD "))
-            token = token.substring("HD ".length).trim();
-
-        let hundredNameMatch = <string>didYouMean(token, Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: didyoumean.ReturnTypeEnums.FIRST_CLOSEST_MATCH, thresholdType: didyoumean.ThresholdTypeEnums.EDIT_DISTANCE, threshold: 2, trimSpaces: true });
-        if (hundredNameMatch !== null)
-            hundredSuburbNames1 = HundredSuburbNames[hundredNameMatch];
-
-        // The other token is usually a suburb name, but is sometimes a hundred name (as indicated
-        // by a "HD " prefix).
-
-        token = tokens[tokens.length - 2].trim();
-        if (token.startsWith("HD ")) {
-            token = token.substring("HD ".length).trim();
-            let hundredNameMatch = <string>didYouMean(token, Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: didyoumean.ReturnTypeEnums.FIRST_CLOSEST_MATCH, thresholdType: didyoumean.ThresholdTypeEnums.EDIT_DISTANCE, threshold: 2, trimSpaces: true });
-            if (hundredNameMatch !== null)
-                hundredSuburbNames2 = HundredSuburbNames[hundredNameMatch];
-        } else {
-            let suburbNameMatch = didYouMean(token, Object.keys(SuburbNames), { caseSensitive: false, returnType: didyoumean.ReturnTypeEnums.FIRST_CLOSEST_MATCH, thresholdType: didyoumean.ThresholdTypeEnums.EDIT_DISTANCE, threshold: 2, trimSpaces: true });
-            if (suburbNameMatch !== null)
-                suburbNames = [ suburbNameMatch ];
-        }
-
-        // Construct the intersection of all the different arrays of suburb names (ignoring any
-        // arrays that are empty).
-
-        let intersectingSuburbNames = formattedStreet.suburbNames
-            .filter(suburbName => hundredSuburbNames1.length === 0 || hundredSuburbNames1.indexOf(suburbName) >= 0)
-            .filter(suburbName => hundredSuburbNames2.length === 0 || hundredSuburbNames2.indexOf(suburbName) >= 0)
-            .filter(suburbName => suburbNames.length === 0 || suburbNames.indexOf(suburbName) >= 0)
-        let suburbName = (intersectingSuburbNames.length === 0) ? formattedStreet.suburbNames[0] : intersectingSuburbNames[0];
-
-        // Reconstruct the full address using the formatted street name and determined suburb name.
-
-        tokens = tokens.slice(0, tokens.length - streetNameIndex);
-        tokens.push(formattedStreet.streetName);
-        tokens.push(SuburbNames[suburbName]);
-        return tokens.join(", ");
-    }
-
-    return address;
+    return formatStreetName(streetName) + ", " + SuburbNames[suburbName];
 }
 
 // Examines all the lines in a page of a PDF and constructs cells (ie. rectangles) based on those
@@ -416,38 +311,37 @@ async function parseCells(page) {
                     previousRectangle = { x: x1, y: y1, width: width, height: height };
                 }
             }
-        } else if (operators.fnArray[index] === pdfjs.OPS.fill && previousRectangle !== undefined) {
+        } else if ((operators.fnArray[index] === pdfjs.OPS.fill || operators.fnArray[index] === pdfjs.OPS.eoFill) && previousRectangle !== undefined) {
             lines.push(previousRectangle);
             previousRectangle = undefined;
         }
     }
 
-    // Determine all the horizontal lines and vertical lines that make up the grid.
+    // Determine all the horizontal lines and vertical lines that make up the grid.  The following
+    // is careful to ignore the short lines and small rectangles that make up the logo at the top
+    // left of the page (otherwise these would cause problems due to the additional cells that
+    // they would cause to be constructed later).
 
     let horizontalLines: Rectangle[] = [];
     let verticalLines: Rectangle[] = [];
 
     for (let line of lines) {
-        // Ignore short lines or smaller rectangles (since these are probably part of the logo at
-        // the top left of the page).
+        if (line.height <= 2 && line.width >= 200) {
+            // Identify a horizontal line (these typically extend across the width of the page).
 
-        if (line.width < 200 && line.height < 200)
-            continue;
-        
-        // Convert any larger rectangles into lines.  This almost always corresponds to a header
-        // (so only take note of the horizontal lines; avoid allowing the vertical lines to cause
-        // very narrow cells to be created).
+            horizontalLines.push(line);
+        } else if (line.width <= 2 && line.height >= 10) {
+            // Identify a vertical line (note that these might not be very tall if there are not
+            // many development applications in the grid).
 
-        if ((line.width > 10 && line.height > 200) || (line.height > 10 && line.width > 200)) {
+            verticalLines.push(line);
+        } else if (line.height >= 5 && line.width >= 200) {
+            // Convert the header into two horizonal lines (the header is typically a rectangle
+            // that extends across the width of the page).
+
             horizontalLines.push({ x: line.x, y: line.y, width: line.width, height: 1 });
             horizontalLines.push({ x: line.x, y: line.y + line.height, width: line.width, height: 1 });
-            continue;
         }
-            
-        if (line.height <= 2)  // horizontal line
-            horizontalLines.push(line);
-        else  // vertical line
-            verticalLines.push(line);
     }
 
     let verticalLineComparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
@@ -589,13 +483,13 @@ async function parsePdf(url: string) {
 
         // Find the heading cells.
 
-        let applicationNumberCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "APPLICATION"));
-        let receivedDateCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "RECEIPT"));
-        let houseNumberCell = cells.find(cell => cell.elements.map(element => element.text.trim()).join(" ") === "NO.");
-        let lotCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "LOT"));
-        let sectionCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "SECTION /"));
-        let addressCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "PROPERTY ADDRESS"));
-        let descriptionCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DESCRIPTION"));
+        let applicationNumberCell = cells.find(cell => cell.elements.some(element => element.text.replace(/\s/g, "") === "APPLICATION"));
+        let receivedDateCell = cells.find(cell => cell.elements.some(element => element.text.replace(/\s/g, "") === "RECEIPT"));
+        let houseNumberCell = cells.find(cell => cell.elements.map(element => element.text).join("").replace(/\s/g, "") === "NO.");
+        let lotCell = cells.find(cell => cell.elements.some(element => element.text.replace(/\s/g, "") === "LOT"));
+        let sectionCell = cells.find(cell => cell.elements.some(element => element.text.replace(/\s/g, "") === "SECTION/"));
+        let addressCell = cells.find(cell => cell.elements.some(element => element.text.replace(/\s/g, "") === "PROPERTYADDRESS"));
+        let descriptionCell = cells.find(cell => cell.elements.some(element => element.text.replace(/\s/g, "") === "DESCRIPTION"));
 
         if (applicationNumberCell === undefined) {
             let elementSummary = elements.map(element => `[${element.text}]`).join("");
@@ -634,25 +528,32 @@ async function parsePdf(url: string) {
             if (rowAddressCell === undefined)
                 continue;
             
-            let hundred = "";
+            let hundred = "";  // used in the legal description later
             let hundredElement = rowAddressCell.elements.pop();
             if (hundredElement.text.trim().startsWith("HD ") || hundredElement.text.trim().toUpperCase().startsWith("HUNDRED "))
                 hundred = hundredElement.text.replace(/^HD /, "").replace(/^HUNDRED /i, "").trim();  // extract the hundred name from the last element
             else
                 rowAddressCell.elements.push(hundredElement);
 
+            let address = rowAddressCell.elements.map(element => element.text).join(", ").replace(/\s\s+/g, " ").trim();
+            address = formatAddress(address);
+            if (address === "" || address.trim() === "-")  // an address must be present
+                continue;
+
             let houseNumber = "";
             if (rowHouseNumberCell !== undefined)
-                houseNumber = rowHouseNumberCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" AND ").replace(/\s\s+/g, " ").trim();
-            
-            let address = (houseNumber + " " + rowAddressCell.elements.map(element => element.text).join(", ")).replace(/\s\s+/g, " ").trim();
-            address = formatAddress(address);
-            if (address === "")  // an address must be present
-                continue;
+                houseNumber = rowHouseNumberCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" & ").replace(/\s\s+/g, " ").trim();
+            address = (houseNumber + " " + address).trim();
 
             // Construct the description.
 
-            let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join(" ").replace(/\s\s+/g, " ").trim();
+            let description = "";
+            if (rowDescriptionCell !== undefined) {
+                description = rowDescriptionCell.elements.map(element => element.text).join(" ").replace(/\s\s+/g, " ").trim();
+                let truncatedDescription = description.replace(/( - )?BUILDING RULES ONLY$/i, "").replace(/( - )?BUILDING ONLY$/i, "").replace(/( - )?PLANNING ONLY$/i, "").trim();
+                if (truncatedDescription !== "")
+                    description = truncatedDescription;
+            }
 
             // Construct the received date.
 
@@ -666,19 +567,19 @@ async function parsePdf(url: string) {
 
             let lot = "";
             if (rowLotCell !== undefined) {
-                lot = rowLotCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" and ").replace(/\s\s+/g, " ").trim();
+                lot = rowLotCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" & ").replace(/\s\s+/g, " ").trim();
                 if (lot !== "")
                     legalElements.push(`Lot ${lot}`);
             }
 
             let section = "";
             if (rowSectionCell !== undefined) {
-                section = rowSectionCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" and ").replace(/\s\s+/g, " ").trim();
+                section = rowSectionCell.elements.filter(element => element.text.trim() !== "-").map(element => element.text).join(" & ").replace(/\s\s+/g, " ").trim();
                 if (section !== "")
                     legalElements.push(`Section ${section}`);
             }
 
-            if (hundred !== "")
+            if (hundred !== "")  // extracted from the address earlier
                 legalElements.push(`Hundred ${hundred}`);
 
             let legalDescription = legalElements.join(", ");
@@ -751,17 +652,18 @@ async function main() {
     // at once because this may use too much memory, resulting in morph.io terminating the current
     // process).
 
-    let selectedPdfUrls: string[] = [];
-    selectedPdfUrls.push(pdfUrls.shift());
-    if (pdfUrls.length > 0)
-        selectedPdfUrls.push(pdfUrls[getRandom(0, pdfUrls.length)]);
-    if (getRandom(0, 2) === 0)
-        selectedPdfUrls.reverse();
+    // let selectedPdfUrls: string[] = [];
+    // selectedPdfUrls.push(pdfUrls.shift());
+    // if (pdfUrls.length > 0)
+    //     selectedPdfUrls.push(pdfUrls[getRandom(0, pdfUrls.length)]);
+    // if (getRandom(0, 2) === 0)
+    //     selectedPdfUrls.reverse();
 
-    for (let pdfUrl of selectedPdfUrls) {
+    // for (let pdfUrl of selectedPdfUrls) {
+    for (let pdfUrl of pdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
         let developmentApplications = await parsePdf(pdfUrl);
-        console.log(`Parsed ${developmentApplications.length} development application(s) from document: ${pdfUrl}`);
+        console.log(`Parsed ${developmentApplications.length} development ${(developmentApplications.length == 1) ? "application" : "applications"} from document: ${pdfUrl}`);
         
         // Attempt to avoid reaching 512 MB memory usage (this will otherwise result in the
         // current process being terminated by morph.io).
@@ -769,7 +671,7 @@ async function main() {
         if (global.gc)
             global.gc();
 
-        console.log(`Inserting development applications into the database.`);
+        console.log("Inserting development applications into the database.");
         for (let developmentApplication of developmentApplications)
             await insertRow(database, developmentApplication);
     }
