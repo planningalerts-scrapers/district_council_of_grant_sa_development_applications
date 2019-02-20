@@ -553,6 +553,7 @@ async function parsePdf(url: string) {
                 let truncatedDescription = description.replace(/( - )?BUILDING RULES ONLY$/i, "").replace(/( - )?BUILDING ONLY$/i, "").replace(/( - )?PLANNING ONLY$/i, "").trim();
                 if (truncatedDescription !== "")
                     description = truncatedDescription;
+                description = description.replace(/\bDW ELLING\b/gi, "DWELLING");  // correct a common problem (an extra space)
             }
 
             // Construct the received date.
@@ -652,15 +653,14 @@ async function main() {
     // at once because this may use too much memory, resulting in morph.io terminating the current
     // process).
 
-    // let selectedPdfUrls: string[] = [];
-    // selectedPdfUrls.push(pdfUrls.shift());
-    // if (pdfUrls.length > 0)
-    //     selectedPdfUrls.push(pdfUrls[getRandom(0, pdfUrls.length)]);
-    // if (getRandom(0, 2) === 0)
-    //     selectedPdfUrls.reverse();
+    let selectedPdfUrls: string[] = [];
+    selectedPdfUrls.push(pdfUrls.shift());
+    if (pdfUrls.length > 0)
+        selectedPdfUrls.push(pdfUrls[getRandom(0, pdfUrls.length)]);
+    if (getRandom(0, 2) === 0)
+        selectedPdfUrls.reverse();
 
-    // for (let pdfUrl of selectedPdfUrls) {
-    for (let pdfUrl of pdfUrls) {
+    for (let pdfUrl of selectedPdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
         let developmentApplications = await parsePdf(pdfUrl);
         console.log(`Parsed ${developmentApplications.length} development ${(developmentApplications.length == 1) ? "application" : "applications"} from document: ${pdfUrl}`);
