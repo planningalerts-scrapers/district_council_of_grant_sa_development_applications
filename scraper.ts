@@ -27,7 +27,6 @@ declare const process: any;
 let StreetNames = null;
 let StreetSuffixes  = null;
 let SuburbNames = null;
-let HundredSuburbNames = null;
 
 // Sets up an sqlite database.
 
@@ -120,10 +119,9 @@ function readAddressInformation() {
         StreetSuffixes[streetSuffixTokens[0].trim()] = streetSuffixTokens[1].trim();
     }
 
-    // Read the suburb names and hundred names.
+    // Read the suburb names.
 
     SuburbNames = {};
-    HundredSuburbNames = {};
     for (let line of fs.readFileSync("suburbnames.txt").toString().replace(/\r/g, "").trim().split("\n")) {
         let suburbTokens = line.toUpperCase().split(",");
         
@@ -133,19 +131,6 @@ function readAddressInformation() {
             SuburbNames["MT " + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
             SuburbNames["MT." + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
             SuburbNames["MT. " + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
-        }
-
-        for (let hundredName of suburbTokens[2].split(";")) {
-            hundredName = hundredName.trim();
-            (HundredSuburbNames[hundredName] || (HundredSuburbNames[hundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
-            if (hundredName.startsWith("MOUNT ")) {
-                let mountHundredName = "MT " + hundredName.substring("MOUNT ".length);
-                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
-                mountHundredName = "MT." + hundredName.substring("MOUNT ".length);
-                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
-                mountHundredName = "MT. " + hundredName.substring("MOUNT ".length);
-                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
-            }
         }
     }
 }
@@ -620,7 +605,7 @@ async function main() {
 
     let database = await initializeDatabase();
 
-    // Read all street, street suffix, suburb and hundred information.
+    // Read all street, street suffix and suburb information.
 
     readAddressInformation();
 
