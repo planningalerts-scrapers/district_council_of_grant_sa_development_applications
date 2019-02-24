@@ -577,7 +577,7 @@ async function parsePdf(url: string) {
                 informationUrl: url,
                 commentUrl: CommentUrl,
                 scrapeDate: moment().format("YYYY-MM-DD"),
-                receivedDate: receivedDate.isValid ? receivedDate.format("YYYY-MM-DD") : "",
+                receivedDate: receivedDate.isValid() ? receivedDate.format("YYYY-MM-DD") : "",
                 legalDescription: legalDescription
             });        
         }
