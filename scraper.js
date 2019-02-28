@@ -293,7 +293,7 @@ async function parsePdf(url) {
         let cells = await parseCells(page);
         // Construct elements based on the text in the PDF page.
         let elements = await parseElements(page);
-        // The co-ordinate system used in a PDF is typically "upside done" so invert the
+        // The co-ordinate system used in a PDF is typically "upside down" so invert the
         // co-ordinates (and so this makes the subsequent logic easier to understand).
         for (let cell of cells)
             cell.y = -(cell.y + cell.height);
