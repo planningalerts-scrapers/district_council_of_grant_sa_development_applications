@@ -70,13 +70,6 @@ async function insertRow(database, developmentApplication) {
     });
 }
 
-// A 2D point.
-
-interface Point {
-    x: number,
-    y: number
-}
-
 // A bounding rectangle.
 
 interface Rectangle {
