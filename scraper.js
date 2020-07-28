@@ -144,7 +144,7 @@ function formatStreetName(text) {
         let threshold = 7 - index; // set the number of allowed spelling errors proportional to the number of words
         let streetNameMatch = didyoumean2_1.default(tokens.slice(-index).join(" "), Object.keys(StreetNames), { caseSensitive: false, returnType: didyoumean.ReturnTypeEnums.FIRST_CLOSEST_MATCH, thresholdType: didyoumean.ThresholdTypeEnums.EDIT_DISTANCE, threshold: threshold, trimSpaces: true });
         if (streetNameMatch !== null) {
-            tokens.splice(-index, index); // remove elements from the end of the array           
+            tokens.splice(-index, index); // remove elements from the end of the array
             return (tokens.join(" ") + " " + streetNameMatch).trim(); // reconstruct the street with any other original prefix text
         }
     }
